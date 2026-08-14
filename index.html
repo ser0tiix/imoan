@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>注文・キッチン管理システム</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Firebase Config Banner (未設定時の警告) -->
+  <div id="config-warning" class="config-banner hidden">
+    ⚠️ Firebase設定（script.js内のfirebaseConfig）を入力するとリアルタイム同期機能が有効化されます。（現在はデモ/ローカル動作中）
+  </div>
+
+  <!-- ヘッダー / モード切替 -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="logo-icon">🍽️</span>
+      <h1>Order & Kitchen OS</h1>
+    </div>
+    <nav class="view-switcher">
+      <button id="btn-view-hall" class="nav-btn active" onclick="switchMainView('hall')">
+        <span class="icon">📱</span> ホール画面
+      </button>
+      <button id="btn-view-kitchen" class="nav-btn" onclick="switchMainView('kitchen')">
+        <span class="icon">🍳</span> キッチン画面
+        <span id="pending-badge" class="badge">0</span>
+      </button>
+    </nav>
+  </header>
+
+  <main class="app-container">
+
+    <!-- ==================== ホール画面 ==================== -->
+    <section id="view-hall" class="main-view active">
+      <div class="hall-layout">
+        
+        <!-- 左側：注文入力フォーム -->
+        <div class="hall-panel order-form-panel">
+          <h2 class="panel-title">新規注文入力</h2>
+          
+          <!-- 客番選択エリア（1〜20のタップ選択式） -->
+          <div class="form-group">
+            <label>客番（番号札）の選択 <span class="required">必須</span></label>
+            
+            <!-- 選択中の客番表示 -->
+            <div class="customer-num-display-wrapper">
+              <span class="prefix">No.</span>
+              <span id="customer-num-display" class="customer-num-display">--</span>
+              <button type="button" class="btn-clear-num" onclick="clearCustomerNum()">クリア</button>
+            </div>
+
+            <!-- 番号選択ボタン（1〜20） -->
+            <div class="quick-num-grid">
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('1')">1</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('2')">2</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('3')">3</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('4')">4</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('5')">5</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('6')">6</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('7')">7</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('8')">8</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('9')">9</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('10')">10</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('11')">11</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('12')">12</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('13')">13</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('14')">14</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('15')">15</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('16')">16</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('17')">17</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('18')">18</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('19')">19</button>
+              <button type="button" class="quick-num-btn" onclick="setCustomerNum('20')">20</button>
+            </div>
+          </div>
+
+          <!-- メニュー選択 -->
+          <div class="form-group">
+            <label>商品選択</label>
+            <div class="menu-grid" id="menu-grid">
+              <!-- JSで動的生成 -->
+            </div>
+          </div>
+
+          <!-- 選択中の商品リスト -->
+          <div class="form-group">
+            <label>注文内容確認</label>
+            <div id="selected-items-list" class="selected-items-container">
+              <p class="empty-msg">商品を選択してください</p>
+            </div>
+          </div>
+
+          <!-- 備考 -->
+          <div class="form-group">
+            <label for="order-note">備考（オプション）</label>
+            <input type="text" id="order-note" placeholder="例：ラーメン ネギ抜き、コーラ氷なし">
+          </div>
+
+          <!-- 注文確定ボタン -->
+          <button id="btn-submit-order" class="btn btn-primary btn-large" onclick="submitOrder()">
+            注文を確定して送信
+          </button>
+        </div>
+
+        <!-- 右側：2階提供用（調理済みモニター） -->
+        <div class="hall-panel ready-monitor-panel">
+          <div class="panel-header">
+            <h2 class="panel-title">配膳待ち（調理済み）</h2>
+            <span class="sub-title">2階へ提供可能な注文</span>
+          </div>
+          <div id="ready-orders-list" class="ready-orders-grid">
+            <!-- JSで動的生成 -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== キッチン画面 ==================== -->
+    <section id="view-kitchen" class="main-view">
+      
+      <!-- キッチンのタブナビゲーション -->
+      <div class="tab-navigation">
+        <button class="tab-btn active" onclick="switchKitchenTab('pending')">
+          未調理 <span id="count-pending" class="tab-count">0</span>
+        </button>
+        <button class="tab-btn" onclick="switchKitchenTab('completed')">
+          調理済み <span id="count-completed" class="tab-count">0</span>
+        </button>
+        <button class="tab-btn" onclick="switchKitchenTab('history')">
+          注文履歴 <span id="count-history" class="tab-count">0</span>
+        </button>
+        <button class="tab-btn" onclick="switchKitchenTab('cancelled')">
+          キャンセル <span id="count-cancelled" class="tab-count">0</span>
+        </button>
+      </div>
+
+      <!-- タブコンテンツエリア -->
+      <div class="tab-content-area">
+        
+        <!-- 未調理タブ -->
+        <div id="tab-pending" class="kitchen-tab-content active">
+          <div id="cards-pending" class="orders-card-grid">
+            <!-- 未調理カード群 -->
+          </div>
+        </div>
+
+        <!-- 調理済みタブ -->
+        <div id="tab-completed" class="kitchen-tab-content">
+          <div id="cards-completed" class="orders-card-grid">
+            <!-- 調理済みカード群 -->
+          </div>
+        </div>
+
+        <!-- 注文履歴タブ -->
+        <div id="tab-history" class="kitchen-tab-content">
+          <div class="table-wrapper">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>客番</th>
+                  <th>注文商品</th>
+                  <th>注文時刻</th>
+                  <th>調理済み時刻</th>
+                  <th>ステータス</th>
+                  <th>詳細</th>
+                </tr>
+              </thead>
+              <tbody id="history-table-body">
+                <!-- 履歴行群 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- キャンセルタブ -->
+        <div id="tab-cancelled" class="kitchen-tab-content">
+          <div id="cards-cancelled" class="orders-card-grid">
+            <!-- キャンセル済みカード群 -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== 注文詳細モーダル ==================== -->
+  <div id="modal-detail" class="modal-overlay hidden" onclick="closeModalOnOverlay(event)">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-customer-badge">
+          客番 <span id="modal-customer-num">--</span>
+        </div>
+        <button class="btn-close" onclick="closeModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-meta-row">
+          <div>ステータス: <span id="modal-status-badge" class="status-badge">--</span></div>
+          <div id="modal-created-time" class="time-label">注文時刻: --:--</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <h3>注文商品</h3>
+        <div id="modal-items-list" class="modal-items-list">
+          <!-- JSで挿入 -->
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="modal-note-box">
+          <span class="label">備考:</span>
+          <span id="modal-note-text">なし</span>
+        </div>
+
+        <div id="modal-cancel-reason-box" class="modal-note-box cancel-reason-box hidden">
+          <span class="label">キャンセル理由:</span>
+          <span id="modal-cancel-reason-text">--</span>
+        </div>
+      </div>
+
+      <div class="modal-footer" id="modal-footer-actions">
+        <!-- 動的アクションボタン（調理済み/キャンセルなど） -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== キャンセル理由入力モーダル ==================== -->
+  <div id="modal-cancel-prompt" class="modal-overlay hidden">
+    <div class="modal-card modal-small">
+      <div class="modal-header">
+        <h3>注文のキャンセル</h3>
+        <button class="btn-close" onclick="closeCancelPrompt()">×</button>
+      </div>
+      <div class="modal-body">
+        <p>キャンセル理由を選択または入力してください。</p>
+        <div class="cancel-reasons-quick">
+          <button type="button" class="chip-btn" onclick="setCancelReason('お客様都合')">お客様都合</button>
+          <button type="button" class="chip-btn" onclick="setCancelReason('品切れ')">品切れ</button>
+          <button type="button" class="chip-btn" onclick="setCancelReason('入力ミス')">入力ミス</button>
+        </div>
+        <input type="text" id="cancel-reason-input" class="text-input" placeholder="キャンセル理由を入力">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeCancelPrompt()">戻る</button>
+        <button class="btn btn-danger" onclick="confirmCancelOrder()">キャンセル確定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JSモジュール読み込み -->
+  <script type="module" src="script.js"></script>
+</body>
+</html>
