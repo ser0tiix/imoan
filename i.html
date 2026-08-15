@@ -808,15 +808,15 @@
   <!-- ヘッダー / モード切替 -->
   <header class="app-header">
     <div class="brand">
-      <span class="logo-icon">🍠</span>
+      <span class="logo-icon"></span>
       <h1>いも庵</h1>
     </div>
     <nav class="view-switcher">
       <button id="btn-view-hall" class="nav-btn active" onclick="switchMainView('hall')">
-        <span class="icon">📝</span> レジ画面
+        <span class="icon"></span> レジ画面
       </button>
       <button id="btn-view-kitchen" class="nav-btn" onclick="switchMainView('kitchen')">
-        <span class="icon">🍳</span> キッチン画面
+        <span class="icon"></span> キッチン画面
         <span id="pending-badge" class="badge">0</span>
       </button>
     </nav>
@@ -915,16 +915,16 @@
       
       <!-- キッチンのタブナビゲーション -->
       <div class="tab-navigation">
-        <button class="tab-btn active" onclick="switchKitchenTab('pending', this)">
+        <button class="tab-btn active" onclick="switchKitchenTab('pending')">
           未調理 <span id="count-pending" class="tab-count">0</span>
         </button>
-        <button class="tab-btn" onclick="switchKitchenTab('completed', this)">
+        <button class="tab-btn" onclick="switchKitchenTab('completed')">
           調理済み <span id="count-completed" class="tab-count">0</span>
         </button>
-        <button class="tab-btn" onclick="switchKitchenTab('history', this)">
+        <button class="tab-btn" onclick="switchKitchenTab('history')">
           注文履歴 <span id="count-history" class="tab-count">0</span>
         </button>
-        <button class="tab-btn" onclick="switchKitchenTab('cancelled', this)">
+        <button class="tab-btn" onclick="switchKitchenTab('cancelled')">
           キャンセル <span id="count-cancelled" class="tab-count">0</span>
         </button>
       </div>
@@ -1054,10 +1054,12 @@
       updateDoc, 
       doc, 
       onSnapshot, 
-      serverTimestamp 
+      serverTimestamp, 
+      query, 
+      orderBy 
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // Firebaseプロジェクトの設定情報
+    // ⚠️ ご自身のFirebaseプロジェクトの設定情報に置き換えてください
     const firebaseConfig = {
       apiKey: "AIzaSyD95xpKH5T5kSPMY_sAKUBcJ_1_4KbXqNU",
       authDomain: "imoan-9fe48.firebaseapp.com",
@@ -1070,8 +1072,8 @@
     let db = null;
     let useFirebase = false;
 
-    // Firebase初期化
-    if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+    // Firebase設定の簡易検証
+    if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
       try {
         const app = initializeApp(firebaseConfig);
         db = getFirestore(app);
@@ -1243,22 +1245,16 @@
       }
     }
 
-    // リアルタイム同期（修正：全件取得後にJS側で最新順にソートして、null状態の書き込みドキュメントを安全に同期）
+    // リアルタイム同期
     function setupRealtimeSync() {
       if (useFirebase) {
-        const ordersRef = collection(db, "orders");
-        onSnapshot(ordersRef, (snapshot) => {
+        const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+        onSnapshot(q, (snapshot) => {
           allOrders = snapshot.docs.map(docSnap => ({
             id: docSnap.id,
             ...docSnap.data()
           }));
-
-          // JS側で安全に降順ソート
-          allOrders.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt));
-
           renderAllViews();
-        }, (err) => {
-          console.error("🔥 Firestore リアルタイム同期エラー:", err);
         });
       } else {
         allOrders = getLocalOrders();
@@ -1283,7 +1279,6 @@
       const str = localStorage.getItem(LOCAL_STORAGE_KEY);
       return str ? JSON.parse(str) : [];
     }
-
     function saveLocalOrders(orders) {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(orders));
     }
@@ -1545,38 +1540,26 @@
       }
     }
 
-    function switchKitchenTab(tabName, btnEl) {
+    function switchKitchenTab(tabName) {
       document.querySelectorAll(".kitchen-tab-content").forEach(el => el.classList.remove("active"));
       document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
 
       document.getElementById(`tab-${tabName}`).classList.add("active");
-      if (btnEl) {
-        btnEl.classList.add("active");
+      if (event && event.currentTarget) {
+        event.currentTarget.classList.add("active");
       }
     }
 
-    // タイムスタンプ比較用ミリ秒変換（ミリ秒ベースで安全に比較）
-    function getMillis(ts) {
-      if (!ts) return Date.now(); // serverTimestamp未反映時は一時的に現在時刻として処理
-      if (ts.toMillis) return ts.toMillis();
-      if (ts.toDate) return ts.toDate().getTime();
-      if (typeof ts === 'string' || typeof ts === 'number') return new Date(ts).getTime();
-      return 0;
-    }
-
-    // タイムスタンプフォーマット表示
+    // ユーティリティ
     function formatTimestamp(ts) {
-      if (!ts) {
-        const now = new Date();
-        return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      }
+      if (!ts) return "--:--";
       let date;
       if (ts.toDate) {
         date = ts.toDate();
-      } else if (typeof ts === 'string' || typeof ts === 'number') {
+      } else if (typeof ts === 'string') {
         date = new Date(ts);
       } else {
-        date = new Date();
+        return "--:--";
       }
       const hours = String(date.getHours()).padStart(2, '0');
       const minutes = String(date.getMinutes()).padStart(2, '0');
